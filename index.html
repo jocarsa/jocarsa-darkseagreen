@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Full Spectrum Sonar</title>
+  <style>
+  @import url('https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+
+  html, body{
+  font-family:Ubuntu, Sans-serif;
+  	padding:0px;
+  	margin:0px;
+  	background:black;
+  	overflow:hidden;
+  }
+    canvas {
+      border: 0px solid black;
+    }
+    button{
+    	
+    	width:100px;
+    	background:white;
+    	border:none;
+    	color:black;
+    	border-radius:30px;
+    	margin:20px;
+    }
+    #stop{
+    	left:140px;
+    }
+    header{
+    	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	justify-content: space-between;
+	align-items: center;
+	align-content: stretch;
+	background:darkseagreen;
+	color:white;
+    }
+    h1{
+    display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	justify-content: center;
+	align-items: center;
+	align-content: stretch;
+    	}
+    	h1 img{
+    		width:50px;
+    	}
+  </style>
+</head>
+<body>
+ <header>
+ 	<h1><img src="darkseagreen.png">jocarsa | darkseagreen</h1>
+ 	<div id="botones">
+ 	 	<button id="start">Comenzar</button>
+  		<button id="stop" disabled>Parar</button>
+ 	</div>
+ </header>
+ 
+  <br><br>
+  <canvas id="visualization" width="1920" height="1080"></canvas>
+  <script>
+    let audioContext;
+    let analyser;
+    let stream;
+    let recording = false;
+    let canvas, ctx;
+
+    const startButton = document.getElementById('start');
+    const stopButton = document.getElementById('stop');
+
+    startButton.addEventListener('click', async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+
+        // Create an AnalyserNode to get frequency data
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048; // Frequency bin count
+        source.connect(analyser);
+
+        canvas = document.getElementById('visualization');
+        ctx = canvas.getContext('2d');
+
+        recording = true;
+        startButton.disabled = true;
+        stopButton.disabled = false;
+
+        // Start visualization loop
+        visualize();
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+      }
+    });
+
+    stopButton.addEventListener('click', () => {
+      recording = false;
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      if (analyser) analyser.disconnect();
+      if (audioContext) audioContext.close();
+      startButton.disabled = false;
+      stopButton.disabled = true;
+    });
+
+    function visualize() {
+      if (!recording) return;
+
+      const bufferLength = analyser.frequencyBinCount; // Number of frequency bins
+      const dataArray = new Uint8Array(bufferLength);
+
+      // Get frequency data
+      analyser.getByteFrequencyData(dataArray);
+
+      // Scroll the canvas to the left
+      ctx.drawImage(canvas, 1, 0, canvas.width - 1, canvas.height, 0, 0, canvas.width - 1, canvas.height);
+      ctx.clearRect(canvas.width - 1, 0, 1, canvas.height);
+
+      // Draw the new frequency data on the right
+      for (let i = 0; i < bufferLength; i++) {
+        const intensity = dataArray[i]; // Intensity of the frequency bin (0-255)
+        const grayscaleValue = intensity; // Use intensity directly for grayscale
+        ctx.fillStyle = `rgb(${grayscaleValue}, ${grayscaleValue}, ${grayscaleValue})`;
+        ctx.fillRect(canvas.width - 1, i, 1, 1); // Draw a vertical line
+      }
+
+      // Repeat
+      requestAnimationFrame(visualize);
+    }
+  </script>
+</body>
+</html>
